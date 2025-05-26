@@ -3,9 +3,12 @@ from django.shortcuts import render, redirect
 from .forms import CampForm ,StudentProfileForm
 from .models import Student,Camp
 from django.utils import timezone
-
-
+from django.shortcuts import get_object_or_404
+from django.views.generic import DetailView
+from datetime import datetime, date
 from django.contrib.auth.views import LoginView
+import re
+import ast
 
 class CustomLoginView(LoginView):
     template_name = 'myapp/account/login.html'
@@ -28,14 +31,137 @@ class CustomSignupView(SignupView):
         return redirect(redirect_url)  # รีไดเร็กต์ไปที่ URL ที่กำหนด
 
 
+from django.utils import timezone
+
 # 1. หน้าแรก
+# ตัวอย่างใน view.py
 class HomePageView(TemplateView):
     template_name = 'myapp/home.html'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        # 1. Slider ตามวันที่ใกล้หมดเขต (เรียง final_date น้อยสุดก่อน)
+        camps = Camp.objects.filter(
+            prove=True,
+            final_date__gte=timezone.now().date()
+        ).order_by('final_date')[:7]
+        context['slider_camps'] = camps
+
+        # 2. Slider ตาม id มากสุด (ค่ายล่าสุด)
+        camps_by_id = Camp.objects.filter(
+            prove=True,
+            final_date__gte=timezone.now().date()
+        ).order_by('-id')[:7]
+        context['slider_camps_by_id'] = camps_by_id
+
+        # 3. เตรียมค่าจาก Student (กรณี login)
+        student_birth = ""
+        student_level = ""
+        student_grade = ""
+        student_degree = ""
+        student_interest = ""
+        personalized_camps = []
+        slider_camps_interest = []
+
+        if self.request.user.is_authenticated:
+            student = Student.objects.filter(email=self.request.user.email).first()
+            if student:
+                # วันเกิดเป็น string สำหรับ JS
+                student_birth = student.birth.strftime('%Y-%m-%d') if student.birth else ""
+                student_level = student.level if student.level else ""
+                student_grade = student.grade if student.grade else ""
+                student_degree = student.degree if student.degree else ""
+                student_interest = student.interest if student.interest else ""
+
+                # 3. Personalized: เฉพาะ student ที่มีวันเกิด (อายุ >= min_age ตอนถึงวัน final_date)
+                if student.birth:
+                    today = timezone.now().date()
+                    birth_date = student.birth
+                    camps_p = Camp.objects.filter(
+                        prove=True,
+                        final_date__gte=today
+                    ).order_by('-id')
+                    def calculate_age(birth, ref_date):
+                        return ref_date.year - birth.year - ((ref_date.month, ref_date.day) < (birth.month, birth.day))
+                    filtered = []
+                    for camp in camps_p:
+                        age_at_final = calculate_age(birth_date, camp.final_date)
+                        if camp.min_age is not None and age_at_final >= camp.min_age:
+                            filtered.append(camp)
+                    personalized_camps = filtered[:7]  # แสดง 7 อันดับ
+
+                # 4. Slider: ตาม interest (keyword matching)
+                interest = student.interest or ""
+                camp_results = list(
+                    Camp.objects.filter(
+                        prove=True,
+                        final_date__gte=timezone.now().date()
+                    ).order_by('-id')[:30]  # เผื่อไว้เยอะๆก่อน
+                )
+
+                keywords = []
+                if interest:
+                    try:
+                        if interest.strip().startswith("["):
+                            items = ast.literal_eval(interest)
+                            if isinstance(items, list):
+                                for item in items:
+                                    if isinstance(item, dict) and 'value' in item:
+                                        keywords.append(item['value'].strip())
+                                    elif isinstance(item, str):
+                                        keywords.append(item.strip())
+                        else:
+                            keywords = [x.strip() for x in interest.split(',') if x.strip()]
+                    except Exception:
+                        keywords = [x.strip() for x in interest.split(',') if x.strip()]
+
+                def keyword_count(camp, keywords):
+                    found = set()
+                    texts = [(camp.detail_activity or ""), (camp.description_camp or "")]
+                    for kw in keywords:
+                        for txt in texts:
+                            if kw and re.search(re.escape(kw), txt, re.IGNORECASE):
+                                found.add(kw)
+                    return len(found)
+
+                if keywords:
+                    camp_results = sorted(
+                        camp_results,
+                        key=lambda camp: (keyword_count(camp, keywords), camp.id),
+                        reverse=True
+                    )
+                else:
+                    camp_results = sorted(camp_results, key=lambda camp: camp.id, reverse=True)
+                slider_camps_interest = camp_results[:7]
+
+        # --- ใส่ลง context ---
+        context['student_birth'] = student_birth
+        context['student_level'] = student_level
+        context['student_grade'] = student_grade
+        context['student_degree'] = student_degree
+        context['student_interest'] = student_interest
+        context['slider_camps_personal'] = personalized_camps  # เงื่อนไขอายุ
+        context['slider_camps_interest'] = slider_camps_interest  # match keyword
+
+        return context
 
 # 2. หน้าประเภทค่าย (health, engineer, …, date)
 class HealthCampView(TemplateView):
     template_name = 'myapp/category_health.html'
+    
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        today = timezone.now().date()
+        upcoming = Camp.objects.filter(prove=True, final_date__gte=today ,typeof_camp='health').order_by('final_date')
+        expired = Camp.objects.filter(prove=True, final_date__lt=today ,typeof_camp='health').order_by('-final_date')
+        all_camps = list(upcoming) + list(expired)
+
+        context['all_camps'] = all_camps
+        print(context['all_camps'])
+
+        return context
 
 class EngineerCampView(TemplateView):
     template_name = 'myapp/category_engineer.html'
@@ -64,19 +190,156 @@ class PersonalizePageView(TemplateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        today = timezone.now().date()
-
-        # ดึงทุกค่ายที่ยังไม่หมดเขตรับสมัคร
-        all_camps = Camp.objects.filter(final_date__gte=today)
-
+        all_camps = Camp.objects.filter(prove=True)
         context['all_camps'] = all_camps
+        context['camp_results'] = []
 
-        if self.request.user.is_authenticated:
+        # Default autofill ว่าง
+        context['student_birth'] = ""
+        context['student_level'] = ""
+        context['student_grade'] = ""
+        context['student_degree'] = ""
+        context['student_interest'] = ""
+
+        if self.request.method == "POST":
+            # เอาค่าที่กรอกจากฟอร์มมาใส่ context
+            birth_str = self.request.POST.get("birth", "")
+            level = self.request.POST.get("level", "")
+            grade = self.request.POST.get("grade", "")
+            degree = self.request.POST.get("degree", "")
+            interest = self.request.POST.get("interest", "")
+
+            context['student_birth'] = birth_str
+            context['student_level'] = level
+            context['student_grade'] = grade
+            context['student_degree'] = degree
+            context['student_interest'] = interest
+
+            camp_results = []
+            try:
+                birth = datetime.strptime(birth_str, "%Y-%m-%d").date() if birth_str else None
+            except Exception:
+                birth = None
+
+            today = date.today()
+            for camp in all_camps:
+                if not camp.final_date or camp.final_date < today:
+                    continue
+
+                # เช็คอายุ
+                if not birth:
+                    continue
+                age = camp.final_date.year - birth.year - (
+                    (camp.final_date.month, camp.final_date.day) < (birth.month, birth.day)
+                )
+                if camp.min_age is not None and age < camp.min_age:
+                    continue
+
+                # เช็คระดับการศึกษา
+                match = False
+                if level == "primary":
+                    if camp.primary:
+                        if camp.primary_grade_from and camp.primary_grade_to and grade:
+                            try:
+                                g = int(grade)
+                                if camp.primary_grade_from <= g <= camp.primary_grade_to:
+                                    match = True
+                            except Exception:
+                                pass
+                        elif camp.primary_grade_condition == 'all':
+                            match = True
+                elif level == "secondary":
+                    if camp.secondary:
+                        if camp.secondary_grade_from and camp.secondary_grade_to and grade:
+                            try:
+                                g = int(grade)
+                                if camp.secondary_grade_from <= g <= camp.secondary_grade_to:
+                                    match = True
+                            except Exception:
+                                pass
+                        elif camp.secondary_grade_condition == 'all':
+                            match = True
+                elif level == "vocational_minor" and camp.vocational_minor:
+                    match = True
+                elif level == "vocational_major" and camp.vocational_major:
+                    match = True
+                elif level == "drop" and camp.drop:
+                    match = True
+                elif level == "degree" and camp.degree:
+                    if camp.degree_grade_condition == 'all':
+                        match = True
+                    elif camp.degree_from and camp.degree_to and degree:
+                        levels = ['bachelor', 'master', 'doctorate']
+                        try:
+                            user_idx = levels.index(degree)
+                            from_idx = levels.index(camp.degree_from)
+                            to_idx = levels.index(camp.degree_to)
+                            if from_idx <= user_idx <= to_idx:
+                                match = True
+                        except Exception:
+                            pass
+                    else:
+                        match = True
+                elif level == "other" and camp.other:
+                    match = True
+
+                if match:
+                    camp_results.append(camp)
+
+            # ============== SORT ตาม interest ==============
+            # 1. ดึง interest ออกมาเป็น list ของคำ (tagify ส่ง string แบบ json หรือ comma-separated)
+            keywords = []
+            if interest:
+                try:
+                    # ถ้าเป็น list ของ dict [{"value":"TCAS"}, ...]
+                    if interest.strip().startswith("["):
+                        items = ast.literal_eval(interest)
+                        if isinstance(items, list):
+                            for item in items:
+                                if isinstance(item, dict) and 'value' in item:
+                                    keywords.append(item['value'].strip())
+                                elif isinstance(item, str):
+                                    keywords.append(item.strip())
+                    else:
+                        keywords = [x.strip() for x in interest.split(',') if x.strip()]
+                except Exception:
+                    keywords = [x.strip() for x in interest.split(',') if x.strip()]
+            def keyword_count(camp, keywords):
+                found = set()
+                texts = [(camp.detail_activity or ""), (camp.description_camp or "")]
+                for kw in keywords:
+                    for txt in texts:
+                        if kw and re.search(re.escape(kw), txt, re.IGNORECASE):
+                            found.add(kw)
+                return len(found)
+
+            # 2. sort ตามจำนวน keyword ที่ match (จากมากไปน้อย)
+            if keywords:
+                camp_results = sorted(
+                    camp_results,
+                    key=lambda camp: keyword_count(camp, keywords),
+                    reverse=True
+                )
+
+            context['camp_results'] = camp_results
+
+        elif self.request.user.is_authenticated:
             student = Student.objects.filter(email=self.request.user.email).first()
-            context['student_birth'] = student.birth if student else None
-            context['student_interest'] = student.interest if student else None
+            if student and student.birth:
+                context['student_birth'] = student.birth.strftime('%Y-%m-%d')
+            else:
+                context['student_birth'] = ""
+            context['student_level'] = student.level if student else ""
+            context['student_grade'] = student.grade if student else ""
+            context['student_degree'] = student.degree if student else ""
+            context['student_interest'] = student.interest if student else ""
+
         return context
-    
+
+    # สำคัญ! ต้อง override post เพื่อให้รับ POST ได้ ไม่ error 405
+    def post(self, request, *args, **kwargs):
+        context = self.get_context_data(**kwargs)
+        return self.render_to_response(context)
 
             
 
@@ -157,3 +420,32 @@ class PromoteFormPageView(TemplateView):
 # 7. โปรโมทกิจกรรม - เสร็จสิ้น
 class PromoteDonePageView(TemplateView):
     template_name = 'myapp/promote_done.html'
+    
+
+#รายละเอียดค่าย
+class CampDetailView(DetailView):
+    model = Camp
+    template_name = 'myapp/camp_detail.html'
+    context_object_name = 'camp'
+
+
+from .utils import generate_promptpay_qr_image_base64
+
+def donate(request):
+    img_base64 = None
+    amount = ""
+    error_msg = ""
+    if request.method == "POST":
+        amount = request.POST.get("amount")
+        try:
+            img_base64 = generate_promptpay_qr_image_base64(
+                mobile="0893280067",
+                amount=amount
+            )
+        except Exception as e:
+            error_msg = str(e)
+    return render(request, "myapp/donate.html", {
+        "img_base64": img_base64,
+        "amount": amount,
+        "error_msg": error_msg,
+    })

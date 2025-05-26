@@ -1,272 +1,294 @@
 {% extends 'myapp/base.html' %}
+{% load static %}
 {% block content %}
 
-  <div class="max-w-xl mx-auto mt-10 text-center">
-    <h1 class="text-xl font-bold mb-4">ค่ายเรียงตามวัน (เก่าที่สุด)</h1>
+<div class="max-w-3xl mx-auto mt-10 p-4 bg-white rounded shadow">
 
-    <button id="show-btn" class="px-6 py-2 bg-[#003049] text-white rounded hover:bg-blue-800">
-      แสดงค่าย 5 อันดับแรก (เก่าที่สุด)
-    </button>
+  <h1 class="text-2xl font-bold mb-6 text-center">ค้นหาแคมป์ที่ตรงกับคุณ</h1>
 
-    <div id="camp-container" class="mt-6 hidden text-left"></div>
-  </div>
+  <form method="post">
+    {% csrf_token %}
 
+    <!-- วันเกิด -->
+    <div style="margin-bottom: 15px;">
+      <label for="birth" style="display: block; margin-bottom: 5px;">วันเกิด:</label>
+      <input
+        type="text"
+        name="birth"
+        id="birth"
+        value="{{ student_birth|default:'' }}"
+        placeholder="yyyy-mm-dd"
+        style="width: 100%; padding: 8px; box-sizing: border-box; max-width: 500px; border: 1px solid #ccc; border-radius: 4px;"
+      >
+    </div>
+    <!-- ระดับกา
+  รศึกษา -->
+    <div style="margin-bottom: 15px;">
+      <label for="id_level" style="display: block; margin-bottom: 5px;">ระดับการศึกษา:</label>
+      <select name="level" id="id_level"
+              style="width: 100%; padding: 8px; box-sizing: border-box; max-width: 500px;
+                    border: 1px solid #ccc; border-radius: 4px;">
+        <option value="">เลือกระดับการศึกษา</option>
+        <option value="primary" {% if student_level == "primary" %}selected{% endif %}>ประถม</option>
+        <option value="secondary" {% if student_level == "secondary" %}selected{% endif %}>มัธยม</option>
+        <option value="vocational_minor" {% if student_level == "vocational_minor" %}selected{% endif %}>ปวช</option>
+        <option value="vocational_major" {% if student_level == "vocational_major" %}selected{% endif %}>ปวส</option>
+        <option value="drop" {% if student_level == "drop" %}selected{% endif %}>เด็กซิ่ว</option>
+        <option value="degree" {% if student_level == "degree" %}selected{% endif %}>ปริญญา</option>
+        <option value="other" {% if student_level == "other" %}selected{% endif %}>บุคคลทั่วไป</option>
+      </select>
+    </div>
 
+    <!-- ชั้นปี -->
+    <div id="grade_div" style="margin-bottom: 15px; display: none;">
+      <label for="id_grade" style="display: block; margin-bottom: 5px;">ชั้นปีที่:</label>
+      <select name="grade" id="id_grade"
+              style="width: 100%; padding: 8px; box-sizing: border-box; max-width: 500px;
+                    border: 1px solid #ccc; border-radius: 4px;">
+        <option value="">เลือกเกรด</option>
+        <option value="1" {% if student_grade == "1" %}selected{% endif %}>1</option>
+        <option value="2" {% if student_grade == "2" %}selected{% endif %}>2</option>
+        <option value="3" {% if student_grade == "3" %}selected{% endif %}>3</option>
+        <option value="4" {% if student_grade == "4" %}selected{% endif %}>4</option>
+        <option value="5" {% if student_grade == "5" %}selected{% endif %}>5</option>
+        <option value="6" {% if student_grade == "6" %}selected{% endif %}>6</option>
+      </select>
+    </div>
 
-  <!-- ปุ่มใหม่: สำหรับค่ายประเภท other -->
-  <button id="show-other-btn" class="mt-4 px-6 py-2 bg-[#CD4236] text-white rounded hover:bg-red-700">
-    แสดงค่ายประเภทอื่น ๆ (5 อันดับ)
-  </button>
+    <!-- ระดับปริญญา -->
+    <div id="degree_div" style="margin-bottom: 15px; display: none;">
+      <label for="id_degree" style="display: block; margin-bottom: 5px;">ระดับ:</label>
+      <select name="degree" id="id_degree"
+              style="width: 100%; padding: 8px; box-sizing: border-box; max-width: 500px;
+                    border: 1px solid #ccc; border-radius: 4px;">
+        <option value="">เลือกระดับปริญญา</option>
+        <option value="bachelor" {% if student_degree == "bachelor" %}selected{% endif %}>ตรี</option>
+        <option value="master" {% if student_degree == "master" %}selected{% endif %}>โท</option>
+        <option value="doctorate" {% if student_degree == "doctorate" %}selected{% endif %}>เอก</option>
+      </select>
+    </div>
 
-  <!-- พื้นที่แสดงค่าย other -->
-  <div id="other-camp-container" class="mt-6 hidden text-left"></div>
-
-  {% if user.is_authenticated and student_birth %}
-    <p class="mt-10 text-lg font-semibold text-gray-700">
-      วันเกิดของคุณ: {{ student_birth|date:"j F Y" }}
-    </p>
-
-    <button id="show-young-btn" class="mt-4 px-6 py-2 bg-red-600 text-white rounded hover:bg-red-800">
-      แสดงค่ายที่คุณอายุน้อยกว่าเกณฑ์ขั้นต่ำ (5 อันดับ)
-    </button>
-
-    <div id="young-camp-container" class="mt-6 hidden text-left"></div>
-  {% endif %}
-
-  {% if user.is_authenticated and student_interest %}
-    <button id="show-interest-btn" class="mt-4 px-6 py-2 bg-yellow-600 text-white rounded hover:bg-yellow-700">
-      แสดงค่ายที่ตรงกับความสนใจของคุณ
-    </button>
-
-    <div id="interest-camp-container" class="mt-6 hidden text-left"></div>
-  {% endif %}
-
-
-  <script>
-    const rawCamps = [
-      {% for camp in all_camps %}
-        {
-          id: {{ camp.id }},
-          name: "{{ camp.camp_name|escapejs }}",
-          final_date: "{{ camp.final_date|date:'Y-m-d' }}",
-          type: "{{ camp.typeof_camp }}",
-          prove: {{ camp.prove|yesno:"true,false" }}
-        }{% if not forloop.last %},{% endif %}
-      {% endfor %}
-    ];
-
-    const MONTHS_TH = [
-      "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-      "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-    ];
-
-    function formatThaiDate(dateStr) {
-      const date = new Date(dateStr);
-      const day = date.getDate();
-      const month = MONTHS_TH[date.getMonth()];
-      const year = date.getFullYear();
-      return `${day} ${month} ${year}`;
-    }
-
-    // ======= ปุ่มที่ 1: แสดงทั้งหมด (5 อันดับแรกเรียงจากวันเก่าสุด) =======
-    const btn = document.getElementById("show-btn");
-    const container = document.getElementById("camp-container");
-
-    btn.addEventListener("click", () => {
-      const sorted = rawCamps
-        .slice()
-        .sort((a, b) => new Date(a.final_date) - new Date(b.final_date))
-        .slice(0, 5);
-
-      container.innerHTML = sorted.map(c => `
-        <div class="border p-4 mb-4 rounded shadow">
-          <p><strong>ID:</strong> ${c.id}</p>
-          <p><strong>ชื่อค่าย:</strong> ${c.name}</p>
-          <p><strong>วันสิ้นสุด:</strong> ${formatThaiDate(c.final_date)}</p>
-          <p><strong>ประเภท:</strong> ${c.type}</p>
+    <div style="margin-bottom: 15px;">
+      <label for="interest" style="display: block; margin-bottom: 5px;">ความสนใจ:</label>
+      <div style="display: flex; gap: 8px; max-width: 500px;">
+        <input type="text" id="interest" name="interest"
+              placeholder="กรอกความสนใจ"
+              value="{% if form.interest.value %}{{ form.interest.value }}{% elif student_interest %}{{ student_interest }}{% endif %}"
+              style="flex: 1; padding: 8px; border: 1px solid #ccc; border-radius: 4px; box-sizing: border-box;" />
+        <button type="button" id="add-tag-btn"
+                style="padding: 8px 12px; background-color: #ccc; border: none; border-radius: 4px; cursor: pointer;">
+          ➕
+        </button>
+      </div>
+      {% if form.interest.errors %}
+        <div class="text-danger" style="margin-top: 5px;">
+          {% for error in form.interest.errors %}
+            <p>{{ error }}</p>
+          {% endfor %}
         </div>
-      `).join('');
+      {% endif %}
+    </div>
 
-      container.classList.remove("hidden");
-    });
+    <div style="display: flex; justify-content: center; gap: 10px; margin-top: 24px;">
+      <button type="button" id="clear-btn"
+              style="background:#ccc;color:#222;padding:10px 24px;border-radius:6px;font-weight:bold;border:none;cursor:pointer;">
+        ล้างข้อมูล
+      </button>
+      <button type="submit"
+              style="background:#003049;color:white;padding:10px 32px;border-radius:6px;font-weight:bold;border:none;cursor:pointer;">
+        ค้นหาค่ายที่ตรงกับคุณ
+      </button>
+    </div>
 
-    // ======= ปุ่มที่ 2: แสดงเฉพาะประเภท other =======
-    const otherBtn = document.getElementById("show-other-btn");
-    const otherContainer = document.getElementById("other-camp-container");
+  </form>
 
-    otherBtn.addEventListener("click", () => {
-      const sortedOther = rawCamps
-        .filter(c => c.type === 'other')
-        .sort((a, b) => new Date(a.final_date) - new Date(b.final_date))
-        .slice(0, 5);
+  <hr class="my-8">
 
-      if (sortedOther.length === 0) {
-        otherContainer.innerHTML = "<p class='text-gray-600'>ไม่พบค่ายประเภทอื่น ๆ</p>";
-      } else {
-        otherContainer.innerHTML = sortedOther.map(c => `
-          <div class="border p-4 mb-4 rounded shadow">
-            <p><strong>ID:</strong> ${c.id}</p>
-            <p><strong>ชื่อค่าย:</strong> ${c.name}</p>
-            <p><strong>วันสิ้นสุด:</strong> ${formatThaiDate(c.final_date)}</p>
-            <p><strong>ประเภท:</strong> ${c.type}</p>
-          </div>
-        `).join('');
-      }
-
-      otherContainer.classList.remove("hidden");
-    });
-  </script>
-
-
-
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const rawCamps = [
-        {% for camp in all_camps %}
-          {
-            id: {{ camp.id }},
-            name: "{{ camp.camp_name|escapejs }}",
-            final_date: "{{ camp.final_date|date:'Y-m-d' }}",
-            type: "{{ camp.typeof_camp }}",
-            min_age: {{ camp.min_age|default:"null" }}
-          }{% if not forloop.last %},{% endif %}
+  {% if camp_results %}
+    <div class="max-w-3xl mx-auto mt-10 p-4 bg-white rounded shadow">
+      <h1 class="text-2xl font-bold mb-6 text-center">ผลการค้นหาแคมป์ที่ตรงกับคุณ</h1>
+      <div id="camp-list">
+        {% for camp in camp_results %}
+          <a href="{% url 'myapp:camp_detail' camp.id %}"
+            class="block border border-gray-300 hover:bg-gray-100 transition rounded mb-4 camp-item {% if forloop.counter > 5 %}hidden{% endif %}">
+            <div class="md:flex p-4 gap-4">
+              <div class="flex-shrink-0">
+                {% if camp.upload_file %}
+                  <img src="{{ camp.upload_file.url }}" alt="{{ camp.camp_name }}"
+                      class="w-full max-w-[300px] md:max-w-[350px] max-h-[400px] object-contain mx-auto" />
+                {% else %}
+                  <div class="w-[200px] h-[150px] bg-gray-200 flex items-center justify-center text-sm text-gray-500">
+                    ไม่มีรูป
+                  </div>
+                {% endif %}
+              </div>
+              <div class="flex-1">
+                <div class="camp-item mt-4 md:mt-2 flex justify-center" data-final-date="{{ camp.final_date|date:'Y-m-d' }}">
+                  <span class="color-indicator rounded-md px-4 py-2 flex items-center justify-center text-base font-semibold text-white transition-colors duration-300 w-fit">
+                    <span class="status-value">กำลังโหลด...</span>
+                  </span>
+                </div>
+                <div class="h-1"></div>
+                <h2 class="text-lg font-bold">{{ camp.camp_name }}</h2>
+                <p class="text-sm text-gray-700 mb-1">{{ camp.description_camp|truncatewords:20 }}</p>
+                <p class="text-sm text-gray-600">วันสิ้นสุด: {{ camp.final_date|date:"j F Y" }}</p>
+                <p class="text-sm">💰 ราคา: {{ camp.price|default:"ฟรี" }}</p>
+                <p class="text-sm">📍 รูปแบบ: {{ camp.get_activity_mode_display }}</p>
+              </div>
+            </div>
+          </a>
         {% endfor %}
-      ];
+      </div>
+      {% if camp_results|length > 5 %}
+        <div class="text-center mt-4">
+          <button id="show-more-btn" class="px-6 py-2 bg-[#CD4236] text-white rounded hover:bg-blue-800">
+            ดูเพิ่มเติม
+          </button>
+        </div>
+      {% endif %}
+    </div>
+    <script src="{% static 'js/list_camp.js' %}"></script>
+    <script>
+      document.addEventListener('DOMContentLoaded', function() {
+        const btn = document.getElementById('show-more-btn');
+        if (!btn) return;
+        btn.addEventListener('click', function() {
+          document.querySelectorAll('#camp-list .camp-item.hidden').forEach(el => el.classList.remove('hidden'));
+          btn.style.display = 'none';
+        });
+      });
+    </script>
+  {% else %}
+    <div class="text-center text-gray-500 py-10">ไม่พบค่ายที่ตรงเงื่อนไข</div>
+  {% endif %}
+</div>
 
-      const MONTHS_TH = [
-        "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-        "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-      ];
 
-      function formatThaiDate(dateStr) {
-        const date = new Date(dateStr);
-        const day = date.getDate();
-        const month = MONTHS_TH[date.getMonth()];
-        const year = date.getFullYear();
-        return `${day} ${month} ${year}`;
-      }
 
-      function calculateAge(birthDateStr, targetDateStr) {
-        const birth = new Date(birthDateStr);
-        const target = new Date(targetDateStr);
-        let age = target.getFullYear() - birth.getFullYear();
-        const mDiff = target.getMonth() - birth.getMonth();
-        if (mDiff < 0 || (mDiff === 0 && target.getDate() < birth.getDate())) {
-          age--;
+
+
+
+
+
+<!-- โหลด js เดิม (ใช้ร่วมกับหน้า list ได้เลย) -->
+<script src="{% static 'js/list_camp.js' %}"></script>
+<script>
+  // ปุ่มดูเพิ่มเติม
+  document.addEventListener('DOMContentLoaded', function() {
+    const btn = document.getElementById('show-more-btn');
+    if (!btn) return;
+    btn.addEventListener('click', function() {
+      document.querySelectorAll('#camp-list .camp-item.hidden').forEach(el => el.classList.remove('hidden'));
+      btn.style.display = 'none';
+    });
+  });
+</script>
+
+
+<script>
+document.getElementById('clear-btn').addEventListener('click', function() {
+    // ล้าง input ทั้งหมดในฟอร์ม
+    document.querySelectorAll('form input[type="text"], form select').forEach(el => {
+        el.value = '';
+        // ถ้าเป็น select ให้รีเซ็ต option แรก
+        if (el.tagName === "SELECT") {
+            el.selectedIndex = 0;
         }
-        return age;
-      }
-
-      const birthDate = {% if student_birth %}"{{ student_birth|date:'Y-m-d' }}"{% else %}null{% endif %};
-
-      const youngBtn = document.getElementById("show-young-btn");
-      const youngContainer = document.getElementById("young-camp-container");
-
-      if (youngBtn && birthDate) {
-        youngBtn.addEventListener("click", () => {
-          const filtered = rawCamps
-            .map(c => {
-              const age = calculateAge(birthDate, c.final_date);
-              return { ...c, student_age: age };
-            })
-            .filter(c => c.min_age !== null && c.student_age < c.min_age)
-            .sort((a, b) => new Date(a.final_date) - new Date(b.final_date))
-            .slice(0, 5);
-
-          if (filtered.length === 0) {
-            youngContainer.innerHTML = "<p class='text-gray-600'>ไม่พบค่ายที่คุณยังไม่ถึงเกณฑ์อายุขั้นต่ำ</p>";
-          } else {
-            youngContainer.innerHTML = filtered.map(c => `
-              <div class="border p-4 mb-4 rounded shadow">
-                <p><strong>ID:</strong> ${c.id}</p>
-                <p><strong>ชื่อค่าย:</strong> ${c.name}</p>
-                <p><strong>วันสิ้นสุด:</strong> ${formatThaiDate(c.final_date)}</p>
-                <p><strong>เกณฑ์ขั้นต่ำ:</strong> ${c.min_age} ปี</p>
-                <p class="text-red-600 font-semibold">คุณจะอายุ ${c.student_age} ปีในวันนั้น</p>
-              </div>
-            `).join('');
-          }
-
-          youngContainer.classList.remove("hidden");
-        });
-      }
-    });  // ❗ ปิด document.addEventListener
-  </script>  <!-- ❗ ปิด <script> อย่างถูกต้อง -->
-
-  <script>
-    document.addEventListener("DOMContentLoaded", function () {
-      const rawCamps = [
-        {% for camp in all_camps %}
-          {
-            id: {{ camp.id }},
-            name: "{{ camp.camp_name|escapejs }}",
-            final_date: "{{ camp.final_date|date:'Y-m-d' }}",
-            type: "{{ camp.typeof_camp }}",
-            description: `{{ camp.description_camp|default:""|escapejs }}`,
-            detail: `{{ camp.detail_activity|default:""|escapejs }}`
-          }{% if not forloop.last %},{% endif %}
-        {% endfor %}
-      ];
-
-      const birthDate = {% if student_birth %}"{{ student_birth|date:'Y-m-d' }}"{% else %}null{% endif %};
-      const interestRaw = {% if student_interest %}{{ student_interest|safe }}{% else %}[] {% endif %};
-
-      const interestWords = interestRaw.map(obj => obj.value.trim());
-
-      const formatThaiDate = (dateStr) => {
-        const MONTHS_TH = [
-          "มกราคม", "กุมภาพันธ์", "มีนาคม", "เมษายน", "พฤษภาคม", "มิถุนายน",
-          "กรกฎาคม", "สิงหาคม", "กันยายน", "ตุลาคม", "พฤศจิกายน", "ธันวาคม"
-        ];
-        const date = new Date(dateStr);
-        const day = date.getDate();
-        const month = MONTHS_TH[date.getMonth()];
-        const year = date.getFullYear();
-        return `${day} ${month} ${year}`;
-      };
-
-      const interestBtn = document.getElementById("show-interest-btn");
-      const interestContainer = document.getElementById("interest-camp-container");
-
-      if (interestBtn && interestWords.length > 0) {
-        interestBtn.addEventListener("click", () => {
-          const scored = rawCamps.map(camp => {
-            const foundWords = interestWords.filter(word =>
-              camp.description.includes(word) || camp.detail.includes(word)
-            );
-
-            return {
-              ...camp,
-              score: foundWords.length,
-              matched: foundWords
-            };
-          });
-
-          const topCamps = scored
-            .filter(c => c.score > 0)
-            .sort((a, b) => b.score - a.score)
-            .slice(0, 10);
-
-          if (topCamps.length === 0) {
-            interestContainer.innerHTML = "<p class='text-gray-600'>ไม่พบค่ายที่ตรงกับความสนใจของคุณ</p>";
-          } else {
-            interestContainer.innerHTML = topCamps.map(c => `
-              <div class="border p-4 mb-4 rounded shadow">
-                <p><strong>ID:</strong> ${c.id}</p>
-                <p><strong>ชื่อค่าย:</strong> ${c.name}</p>
-                <p><strong>วันสิ้นสุด:</strong> ${formatThaiDate(c.final_date)}</p>
-                <p><strong>ประเภท:</strong> ${c.type}</p>
-                <p class="text-green-700 font-semibold">คำที่พบ: ${c.matched.join(", ")}</p>
-              </div>
-            `).join('');
-          }
-
-          interestContainer.classList.remove("hidden");
-        });
-      }
     });
-  </script>
+    // Tagify
+    if (window.tagify) {
+        tagify.removeAllTags();
+    }
+    // ถ้ามีฟิลด์แบบ dynamic อื่นๆ ให้เพิ่ม reset ที่นี่
+
+    // toggle ฟิลด์ level เพื่อซ่อนเกรด/ปริญญา
+    toggleFields();
+});
+</script>
+
+
+
+
+
+<!-- Flatpickr JS & CSS -->
+<link href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/flatpickr"></script>
+<script>
+  flatpickr("#birth", {
+    dateFormat: "Y-m-d",
+    maxDate: "today"
+  });
+</script>
+
+
+
+<script>
+  function toggleFields() {
+    const level = document.getElementById('id_level').value;
+    const gradeDiv = document.getElementById('grade_div');
+    const degreeDiv = document.getElementById('degree_div');
+
+    // ซ่อนทุกอย่างก่อน
+    gradeDiv.style.display = 'none';
+    degreeDiv.style.display = 'none';
+
+    if (level === 'primary' || level === 'secondary') {
+      gradeDiv.style.display = 'block';
+    } else if (level === 'degree') {
+      degreeDiv.style.display = 'block';
+    }
+  }
+  document.addEventListener('DOMContentLoaded', toggleFields);
+  document.getElementById('id_level').addEventListener('change', toggleFields);
+</script>
+
+
+
+<script src="https://cdn.jsdelivr.net/npm/@yaireo/tagify"></script>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@yaireo/tagify/dist/tagify.css" />
+<script>
+  // ดึงค่าที่มีอยู่ (string comma-separated หรือ empty)
+  var input = document.getElementById('interest');
+  var startValue = input.value;
+
+  // หากเป็น comma-separated (string) ให้แปลงเป็น array
+  if (startValue && typeof startValue === "string" && startValue.includes(',')) {
+    startValue = startValue.split(',').map(s => s.trim());
+    input.value = startValue.join(',');
+  }
+
+  // สร้าง Tagify
+  var tagify = new Tagify(input, {
+    whitelist: ["ค่ายสายภาษา", "ค่ายสายสุขภาพ", "ค่ายสายวิศวกรรม", "ค่ายสายดิจิทัล/IT"],
+    maxTags: 5,
+    dropdown: { enabled: 0 }
+  });
+
+  // เพิ่ม tag เมื่อกดปุ่ม "+"
+  document.getElementById('add-tag-btn').addEventListener('click', function() {
+    var tagValue = input.value.trim();
+    if (tagValue) {
+      tagify.addTags([tagValue]);
+      input.value = '';
+    }
+  });
+
+  // เพิ่ม tag เมื่อกด Enter
+  input.addEventListener("keydown", function(event) {
+    if (event.key === "Enter") {
+      var tagValue = input.value.trim();
+      if (tagValue) {
+        tagify.addTags([tagValue]);
+        input.value = '';
+      }
+    }
+  });
+</script>
+
+
+
+
+
 
 
 

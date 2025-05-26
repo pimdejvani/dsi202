@@ -11,25 +11,11 @@
 </head>
 <body class="flex flex-col min-h-screen">
 
-
-  <div>
-
     <!-- 1.1 – Desktop Header Bar -->
     <div class="hidden md:flex bg-[#003049] text-white">
       <div class="container mx-auto flex items-center justify-center px-6 py-4">
         <!-- form ขยายเต็มพื้นที่ แต่ไม่เกิน 720px -->
-        <form
-          action="/search/"
-          method="get"
-          class="flex flex-grow max-w-[420px] space-x-[2px]"
-        >
-          <input
-            type="text"
-            name="q"
-            placeholder="ค้นหาแคมป์..."
-            class="flex-grow bg-white text-gray-800 px-4 py-2 rounded"
-          />
-        </form>
+
 
         <!-- 2) โปรโมทกิจกรรม -->
         <a href="{% url 'myapp:promote-start' %}"
@@ -41,6 +27,12 @@
         <a href="{% url 'myapp:personalize-camp' %}"
           class="ml-6 w-36 border border-white px-4 py-2 rounded text-center inline-block">
           ค้นหาตัวตน
+        </a>
+
+        <!-- 4) Donate -->
+        <a href="{% url 'myapp:donate' %}"
+          class="ml-6 w-36 border border-white bg-[#CD4236] hover:bg-[#b54800] text-white px-4 py-2 rounded text-center inline-block font-semibold shadow transition">
+          สนับสนุน
         </a>
 
         <!-- ปุ่มโปรไฟล์ -->
@@ -115,6 +107,7 @@
           <button id="profileDropdownButton" class="inline-block ml-4">
             <img
               src="{% static 'images/profile.png' %}"
+              src="{% static 'images/profile.png' %}"
               alt="Profile"
               class="h-8 w-8 rounded-full"
             />
@@ -159,13 +152,7 @@
       <div id="mobile-nav"
           class="hidden fixed inset-y-0 left-0 w-64 bg-white z-50 p-4 space-y-4 overflow-auto">
         <!-- 1) Search (ยาวเต็มแถบ, เอาปุ่มออก) -->
-        <div>
-          <input
-            type="text"
-            placeholder="ค้นหาแคมป์..."
-            class="w-full bg-gray-100 rounded px-3 py-2 text-gray-800"
-          />
-        </div>
+
         <!-- 2) โปรโมทกิจกรรม -->
         <a
         href="{% url 'myapp:promote-start' %}"
@@ -179,7 +166,13 @@
           class="block w-full bg-[#003049] text-white px-4 py-2 rounded text-center mt-2"
         >
           ค้นหาตัวตน
-        </a>
+      </a>
+        <a
+          href="{% url 'myapp:donate' %}"
+          class="block w-full bg-[#CD4236] hover:bg-[#b54800] text-white px-4 py-2 rounded text-center mt-2 font-semibold shadow transition"
+        >
+        สนับสนุน
+      </a>
       </div>
 
     
@@ -301,23 +294,23 @@
     </div>
     
     <script>
-    const profileBtn = document.getElementById("profile-btn");
-    const dropdown = document.getElementById("dropdown");
+      const profileBtn = document.getElementById("profile-btn");
+      const dropdown = document.getElementById("dropdown");
 
-    if (profileBtn && dropdown) {
-      profileBtn.addEventListener("click", function (event) {
-        event.preventDefault();
-        dropdown.classList.toggle("hidden");
-      });
+      if (profileBtn && dropdown) {
+        profileBtn.addEventListener("click", function (event) {
+          event.preventDefault();
+          dropdown.classList.toggle("hidden");
+        });
 
-      window.addEventListener("click", function (event) {
-        // ปิด dropdown ถ้าคลิกนอกเมนู
-        if (!profileBtn.contains(event.target) && !dropdown.contains(event.target)) {
-          dropdown.classList.add("hidden");
-        }
-      });
-    }
-  </script>
+        window.addEventListener("click", function (event) {
+          // ปิด dropdown ถ้าคลิกนอกเมนู
+          if (!profileBtn.contains(event.target) && !dropdown.contains(event.target)) {
+            dropdown.classList.add("hidden");
+          }
+        });
+      }
+    </script>
 
   </header>
   <!-- MAIN CONTENT -->
@@ -326,7 +319,7 @@
   </main>
 
   <!-- FOOTER -->
-  <footer class="bg-[#003049] text-white py-4">
+  <footer class="bg-[#003049] text-white py-4 mt-auto">
     <div class="container mx-auto text-center">
       <p class="text-sm">
         ติดต่อเรา: email@example.com &bull; โทร. 02-123-4567 &bull; ที่อยู่: 123 ถนนตัวอย่าง แขวงตัวอย่าง เขตตัวอย่าง กรุงเทพฯ
